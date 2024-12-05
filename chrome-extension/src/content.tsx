@@ -1,7 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import ChatArea from './components/ChatArea/ChatArea';
-
+import InputFooter from './components/InputFooter/InputFooter';
+import './globals.css';
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "ping") {
@@ -15,7 +16,73 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
+function ChatPanel() {
+    // Create initial state
+    const initialChatHistory = [
+        {
+            isHuman: false,
+            content: "Hi! I'm your YouTube assistant. Ask me anything about this video and I will answer your questions.",
+            timestamp: new Date()
+        }
+    ];
+
+    const [chatHistory, setChatHistory] = React.useState(initialChatHistory);
+
+    const handleMessageSend = async (message: string) => {
+        // Add user message
+        const userMessage = {
+            isHuman: true,
+            content: message,
+            timestamp: new Date()
+        };
+        
+        setChatHistory(prev => [...prev, userMessage]);
+
+        // Simulate AI response
+        const dummyAiResponse = {
+            isHuman: false,
+            content: "This is a placeholder AI response. The actual AI integration will be implemented later.",
+            timestamp: new Date()
+        };
+
+        // Add AI response after a small delay to simulate processing
+        setTimeout(() => {
+            setChatHistory(prev => [...prev, dummyAiResponse]);
+        }, 1000);
+    };
+
+    return (
+        <div className="chat-extension-root" style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100%',
+            gap: '8px',
+            padding: '8px',
+            boxSizing: 'border-box'
+        }}>
+            <div style={{
+                height: '20px',
+                width: '100%',
+                backgroundColor: 'var(--yc-red)',
+                color: 'var(--fg-on-accent)',
+            }}>Close Panel</div>
+            <div style={{ 
+                flex: '1 1 auto',
+                overflowY: 'auto',
+                minHeight: 0, // This is important for Firefox
+            }}>
+                <ChatArea chatHistory={chatHistory} />
+            </div>
+            <div style={{ flexShrink: 0 }}>
+                <InputFooter onMessageSend={handleMessageSend} isSendingDisabled={false} />
+            </div>
+        </div>
+    );
+}
+
 function createChatPanel() {
+    const chatPanelWidth = 333;
+
     // Check if panel already exists
     if (document.getElementById('youtube-chat-panel')) {
         return;
@@ -24,22 +91,28 @@ function createChatPanel() {
     // Create the chat panel
     const chatPanel = document.createElement('div');
     chatPanel.id = 'youtube-chat-panel';
+    chatPanel.className = 'chat-extension-root';
     chatPanel.style.cssText = `
         position: fixed;
-        top: 56px; /* YouTube's header height */
+        top: 56px;
         right: 0;
-        width: 400px;
+        width: ${chatPanelWidth}px;
         height: calc(100vh - 56px);
-        background-color: white;
-        border-left: 1px solid #e0e0e0;
+        background-color: var(--bg-base);
+        border-left: 1px solid var(--border-base);
         z-index: 2000;
-        box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
-        overflow-y: auto; /* Add scrolling for chat content */
+        box-shadow: var(--box-shadow);
     `;
 
     // Create a container for React
     const reactRoot = document.createElement('div');
     reactRoot.id = 'youtube-chat-react-root';
+    reactRoot.className = 'chat-extension-root'; // Add this line
+    reactRoot.style.cssText = `
+        
+        height: 100%;
+        
+    `;
     chatPanel.appendChild(reactRoot);
 
     // Add the panel to the page
@@ -49,20 +122,7 @@ function createChatPanel() {
     const root = createRoot(reactRoot);
     root.render(
         <React.StrictMode>
-            <ChatArea
-                chatHistory={[
-                    {
-                        isHuman: true,
-                        content: "Hello! This is a test message.",
-                        timestamp: new Date()
-                    },
-                    {
-                        isHuman: false,
-                        content: "Hi! I'm your YouTube assistant.",
-                        timestamp: new Date()
-                    }
-                ]}
-            />
+            <ChatPanel />
         </React.StrictMode>
     );
 
@@ -70,17 +130,19 @@ function createChatPanel() {
     const secondaryContainer = document.getElementById('secondary');
     const pageManager = document.getElementById('page-manager');
 
+    
+
     if (primaryContainer) {
-        primaryContainer.style.marginRight = '400px';
-        primaryContainer.style.width = 'calc(100% - 400px)';
+        primaryContainer.style.marginRight = `${chatPanelWidth}px`;
+        primaryContainer.style.width = `calc(100% - ${chatPanelWidth}px)`;
     }
 
     if (secondaryContainer) {
-        secondaryContainer.style.marginRight = '400px';
+        secondaryContainer.style.marginRight = `${chatPanelWidth}px`;
     }
 
     if (pageManager) {
-        pageManager.style.marginRight = '400px';
+        pageManager.style.marginRight = `${chatPanelWidth}px`;
     }
 
     // Add the panel to the page (remove the duplicate append at the end)

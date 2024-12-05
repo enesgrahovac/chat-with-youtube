@@ -52,15 +52,15 @@ const Message = ({
           <div
             className={isHuman ? styles.senderAvatar : styles.receiverAvatar}
           />
-          <h3 className={styles.header}>{isHuman ? <>You</> : <>Your Journal</>}</h3>
+          <h3 className={styles.header}>{isHuman ? <>You</> : <>YouTube Copilot</>}</h3>
           {!isHuman && (
             <div className={styles.modelContainer}>
               <p className={styles.modelInfo}>GPT 4o</p>
-              <p className={styles.onHoverModel}>
+              {/* <p className={styles.onHoverModel}>
                 Want to switch between models?{" "}
                 
                 .
-              </p>
+              </p> */}
             </div>
           )}
         </div>

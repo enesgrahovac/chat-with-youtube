@@ -1,0 +1,72 @@
+.base {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.rg {
+  font-size: 15px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 20px;
+}
+
+.sm {
+  font-size: 13px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 16px;
+}
+
+.icon svg {
+  color: currentColor !important;
+}
+
+.icon {
+  display: flex;
+}
+
+.hasLabel {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.primary:hover,
+.secondary:hover {
+  opacity: 0.8;
+}
+
+.disabled:hover {
+  opacity: 0.6;
+}
+
+.primary {
+  background-color: var(--yc-red);
+  color: var(--fg-on-accent);
+}
+
+.secondary {
+  background-color: var(--bg-muted);
+  color: var(--fg-base);
+}
+
+.ghost:hover {
+  background-color: var(--hover-bg);
+}
+
+.ghost {
+  background-color: transparent;
+  transition: background-color 0.3s ease-in-out;
+  color: var(--fg-base);
+}
+
+.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

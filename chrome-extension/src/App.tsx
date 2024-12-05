@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styles from './App.module.css';
+import './globals.css';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

@@ -47,7 +47,7 @@
 }
 
 .receiverAvatar {
-  background-color: var(--bq-maroon);
+  background-color: var(--yc-red);
 }
 
 .senderAvatar {
@@ -83,16 +83,16 @@
 }
 
 .senderBubble {
-  background-color: var(--bq-maroon);
+  background-color: var(--yc-red);
 }
 
 .senderBubble p {
   color: var(--fg-on-accent);
 }
 
-.onHoverModel {
+/* .onHoverModel {
   display: none;
-}
+} */
 
 .modelInfo {
   display: block;
@@ -118,9 +118,9 @@
   color: var(--fg-muted);
 }
 
-.modelContainer:hover .modelInfo {
+/* .modelContainer:hover .modelInfo {
   display: none;
-}
+} */
 
 .messageBubble p {
   width: fit-content;

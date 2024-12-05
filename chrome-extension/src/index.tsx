@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import App from './App'; // Adjust this if your main component is named differently
+import './globals.css';
 
 ReactDOM.render(
     <React.StrictMode>
