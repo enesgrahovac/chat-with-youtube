@@ -85,6 +85,14 @@ function getVideoMetadata(): { videoId: string; captionUrl: string | null } | nu
 function ChatPanel() {
 
     const [isPanelOpen, setIsPanelOpen] = React.useState(true);
+    const [videoId, setVideoId] = React.useState<string | null>(null);
+
+    React.useEffect(() => {
+        const videoMetadata = getVideoMetadata();
+        if (videoMetadata) {
+            setVideoId(videoMetadata.videoId);
+        }
+    }, []);
 
     const handlePanelToggle = async () => {
         const panel = document.getElementById('youtube-chat-panel');
@@ -93,7 +101,7 @@ function ChatPanel() {
         const pageManager = document.getElementById('page-manager');
         const floatingButton = document.getElementById('youtube-chat-floating-button');
         const chatPanelWidth = 333;
-    
+
         if (isPanelOpen) {
             // Close panel
             if (panel) panel.style.transform = `translateX(${chatPanelWidth}px)`;
@@ -101,7 +109,7 @@ function ChatPanel() {
             if (secondaryContainer) secondaryContainer.style.marginRight = '0';
             if (pageManager) pageManager.style.marginRight = '0';
             if (floatingButton) floatingButton.style.display = 'flex'; // Show floating button
-           
+
         } else {
             // Open panel
             console.log('Opening panel');
@@ -111,7 +119,7 @@ function ChatPanel() {
             if (pageManager) pageManager.style.marginRight = `${chatPanelWidth}px`;
             if (floatingButton) floatingButton.style.display = 'none'; // Hide floating button
             console.log('Getting video metadata');
-           
+
         }
         setIsPanelOpen(!isPanelOpen);
     };
@@ -134,11 +142,39 @@ function ChatPanel() {
             content: message,
             timestamp: new Date()
         };
-        
-        setChatHistory(prev => [...prev, userMessage]);
+
+        const newChatHistory = [...chatHistory, userMessage];
+        setChatHistory(prev => newChatHistory);
+
+        // Add animated placeholder message
+        let dotCount = 1;
+        const intervalId = setInterval(() => {
+            const dots = '.'.repeat(dotCount);
+            const placeholderMessage: ChatMessage = {
+                isHuman: false,
+                content: dots,
+                timestamp: new Date()
+            };
+            setChatHistory(prev => {
+                const lastMessage = prev[prev.length - 1];
+                if (lastMessage && !lastMessage.isHuman) {
+                    // Replace the last placeholder message
+                    return [...prev.slice(0, -1), placeholderMessage];
+                }
+                // Add new placeholder message
+                return [...prev, placeholderMessage];
+            });
+            dotCount = dotCount === 3 ? 1 : dotCount + 1;
+        }, 500); // Update every 500ms
 
         // Send message to background script
-        chrome.runtime.sendMessage({ action: "processMessage", chatMessages: chatHistory}, (response) => {
+        chrome.runtime.sendMessage({ action: "processMessage", chatMessages: newChatHistory, videoId: videoId }, (response) => {
+            // Stop the animation
+            clearInterval(intervalId);
+
+            // Remove the last message (placeholder)
+            setChatHistory(prev => prev.slice(0, -1));
+
             if (response && response.content) {
                 // Add AI response from background script
                 const aiResponse = {
@@ -168,13 +204,13 @@ function ChatPanel() {
                 display: 'flex',
                 alignItems: 'center',
             }}>
-                <Button 
-                    variant="ghost" 
-                    icon={<PanelRightClose strokeWidth={1} size={24}/>}
+                <Button
+                    variant="ghost"
+                    icon={<PanelRightClose strokeWidth={1} size={24} />}
                     onClick={handlePanelToggle}
                 />
             </div>
-            <div style={{ 
+            <div style={{
                 flex: '1 1 auto',
                 overflowY: 'auto',
                 minHeight: 0, // This is important for Firefox
@@ -186,6 +222,12 @@ function ChatPanel() {
             </div>
         </div>
     );
+}
+
+function sendVideoMetadataToBackground() {
+    const videoMetadata = getVideoMetadata();
+    console.log('Video Metadata on Panel Creation:', videoMetadata);
+    chrome.runtime.sendMessage({ action: "getVideoCaptions", videoId: videoMetadata?.videoId, captionUrl: videoMetadata?.captionUrl });
 }
 
 function createChatPanel() {
@@ -213,8 +255,8 @@ function createChatPanel() {
         transition: transform 0.3s ease;
     `;
 
-    const videoMetadata = getVideoMetadata();
-    console.log('Video Metadata on Panel Creation:', videoMetadata);
+    const videoMetadata = sendVideoMetadataToBackground();
+
 
 
     const floatingButton = document.createElement('div');
@@ -235,7 +277,7 @@ function createChatPanel() {
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         z-index: 2001;
     `;
-    
+
     // Create a container for the icon
     const iconContainer = document.createElement('div');
     iconContainer.style.cssText = `
@@ -293,7 +335,7 @@ function createChatPanel() {
     const secondaryContainer = document.getElementById('secondary');
     const pageManager = document.getElementById('page-manager');
 
-    
+
 
     if (primaryContainer) {
         primaryContainer.style.marginRight = `${chatPanelWidth}px`;

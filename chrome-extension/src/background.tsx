@@ -1,5 +1,9 @@
-import { ChatMessage } from './types';
+import { ChatMessage, ChatGPTMessage } from './types';
 import { convertToChatGPTMessages } from './utils';
+
+const videoCaptionsMap = new Map<string, string | null>();
+
+
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     const isPageLoadingOrComplete = ((changeInfo.status === 'complete'));
     if (!isPageLoadingOrComplete) {
@@ -17,8 +21,20 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     }
 });
 
-const callChatGPT = async (messages: ChatMessage[]) => {
+const callLLM = async (messages: ChatMessage[], videoId: string) => {
+    const captions = videoCaptionsMap.get(videoId);
     const chatGPTMessages = convertToChatGPTMessages(messages);
+    console.log('captions', captions);
+    const systemMessage: ChatGPTMessage = {
+        role: "system",
+        content: `The user is watching a youtube video with the following captions: ${captions}`
+    }
+    const aiResponse = await callChatGPT([systemMessage, ...chatGPTMessages]);
+    return aiResponse;
+}
+
+const callChatGPT = async (messages: ChatGPTMessage[]) => {
+    console.log('messages to chatGpt', messages);
     try {
         console.log('Calling ChatGPT', process.env.OPENAI_API_KEY);
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -29,13 +45,7 @@ const callChatGPT = async (messages: ChatMessage[]) => {
             },
             body: JSON.stringify({
                 model: "gpt-4o",
-                messages: [
-                    // {
-                    //     role: "system",
-                    //     content: "You are a helpful assistant."
-                    // },
-                    ...chatGPTMessages
-                ]
+                messages
             })
         });
 
@@ -56,9 +66,10 @@ const callChatGPT = async (messages: ChatMessage[]) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "processMessage") {
         const chatMessages: ChatMessage[] = request.chatMessages;
+        const videoId = request.videoId;
 
         // Process the message and generate a response
-        callChatGPT(chatMessages).then(aiResponse => {
+        callLLM(chatMessages, videoId).then(aiResponse => {
             // Send the response back to the content script
             sendResponse({ content: aiResponse });
 
@@ -69,6 +80,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
 
         return true; // Keep this to indicate async response
+    }
+    else if (request.action === "getVideoCaptions") {
+        const videoId = request.videoId;
+        if (request && request.videoId && request.captionUrl !== undefined) {
+            fetch(request.captionUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch captions: ${response.statusText}`);
+                    }
+                    return response.text(); // Assuming the captions are in text format
+                })
+                .then(captions => {
+                    videoCaptionsMap.set(request.videoId, captions);
+                    console.log('videoCaptionsMap', videoCaptionsMap);
+                })
+                .catch(error => {
+                    console.error('Error fetching video captions:', error);
+                });
+        }
     }
 });
 

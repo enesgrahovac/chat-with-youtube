@@ -20,3 +20,4 @@ run
 - 4 December 2024: To make a simple chat show up on the right side of the youtube watch screen.
 - 5 December 2024: Fix styling on chat. And allow messaging and dummy responses. Maybe AI responses if time permits.
 - 6 December 2024: When user sends a message, get an AI response and show it in the chat.
+- 7 December 2024: Make the chat respond based on the video transcript.

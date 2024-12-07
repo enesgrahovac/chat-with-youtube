@@ -72,6 +72,7 @@
   border-radius: 12px;
   border-top-left-radius: 6px;
   width: fit-content;
+  max-width: 100%;
 }
 
 .receiverBubble {
@@ -130,24 +131,33 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 100%;
+  overflow-x: auto;
 }
 
 .markdown pre {
   border-radius: 12px;
   font-size: 14px;
   margin: 0;
-
   page-break-inside: avoid;
   max-width: 100%;
   overflow: auto;
   display: block;
   word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.markdown ol,
+.markdown ul {
+  padding-left: 24px; /* Add this to create space for markers */
+  margin: 0; /* Reset default margins */
 }
 
 .markdown ol li,
 .markdown ul li {
   color: var(--fg-base);
   padding-bottom: 8px;
+  display: list-item;
 }
 
 .markdown ol li::marker {
