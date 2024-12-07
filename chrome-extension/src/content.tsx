@@ -2,6 +2,8 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import ChatArea from './components/ChatArea/ChatArea';
 import InputFooter from './components/InputFooter/InputFooter';
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import Button from './components/patterns/Button/Button';
 import './globals.css';
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -16,7 +18,103 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
+// type YtInitialPlayerResponse = {
+//     videoDetails: {
+//         videoId: string;
+//     };
+//     captions?: {
+//         playerCaptionsTracklistRenderer: {
+//             captionTracks: Array<{
+//                 languageCode: string;
+//                 baseUrl: string;
+//             }>;
+//         };
+//     };
+// };
+
+function getVideoMetadata(): { videoId: string; captionUrl: string | null } | null {
+    const scripts = document.querySelectorAll('script');
+    let ytInitialPlayerResponse: any = undefined;
+
+    scripts.forEach(script => {
+        if (script.textContent && script.textContent.includes('ytInitialPlayerResponse')) {
+            const jsonString = script.textContent.match(/ytInitialPlayerResponse\s*=\s*(\{.*?\});/);
+            if (jsonString && jsonString[1]) {
+                try {
+                    ytInitialPlayerResponse = JSON.parse(jsonString[1]);
+                } catch (error) {
+                    console.error('Failed to parse ytInitialPlayerResponse JSON:', error);
+                }
+            }
+            // end the loop
+            return;
+        }
+    });
+
+    if (ytInitialPlayerResponse === undefined) {
+        // Reload the page
+        window.location.reload();
+        return null;
+    }
+
+    const videoIdFromYtInitialPlayerResponse = ytInitialPlayerResponse.videoDetails.videoId;
+
+    // if the video id from the url isn't the same as the video id in the ytInitialPlayerResponse, then reload the page
+    const urlParams = new URLSearchParams(window.location.search);
+    const videoIdFromUrl = urlParams.get('v');
+    if (videoIdFromUrl !== videoIdFromYtInitialPlayerResponse) {
+        window.location.reload();
+        return null;
+    }
+
+    let captionUrl: string | null = null;
+    if (ytInitialPlayerResponse.captions) {
+        const captionsTracks = ytInitialPlayerResponse.captions.playerCaptionsTracklistRenderer.captionTracks;
+
+        // Iterate over the captions tracks to find the one with languageCode 'en'
+        const englishTrack = captionsTracks.find((track: any) => track.languageCode === 'en');
+
+        // If an English track is found, use its baseUrl, otherwise use the first track's baseUrl
+        captionUrl = englishTrack ? englishTrack.baseUrl : captionsTracks[0]?.baseUrl || null;
+    }
+
+    return { videoId: videoIdFromYtInitialPlayerResponse, captionUrl };
+}
+
 function ChatPanel() {
+
+    const [isPanelOpen, setIsPanelOpen] = React.useState(true);
+
+    const handlePanelToggle = async () => {
+        const panel = document.getElementById('youtube-chat-panel');
+        const primaryContainer = document.getElementById('primary');
+        const secondaryContainer = document.getElementById('secondary');
+        const pageManager = document.getElementById('page-manager');
+        const floatingButton = document.getElementById('youtube-chat-floating-button');
+        const chatPanelWidth = 333;
+    
+        if (isPanelOpen) {
+            // Close panel
+            if (panel) panel.style.transform = `translateX(${chatPanelWidth}px)`;
+            if (primaryContainer) primaryContainer.style.marginRight = '0';
+            if (secondaryContainer) secondaryContainer.style.marginRight = '0';
+            if (pageManager) pageManager.style.marginRight = '0';
+            if (floatingButton) floatingButton.style.display = 'flex'; // Show floating button
+           
+        } else {
+            // Open panel
+            console.log('Opening panel');
+            if (panel) panel.style.transform = 'translateX(0)';
+            if (primaryContainer) primaryContainer.style.marginRight = `${chatPanelWidth}px`;
+            if (secondaryContainer) secondaryContainer.style.marginRight = `${chatPanelWidth}px`;
+            if (pageManager) pageManager.style.marginRight = `${chatPanelWidth}px`;
+            if (floatingButton) floatingButton.style.display = 'none'; // Hide floating button
+            console.log('Getting video metadata');
+           
+        }
+        setIsPanelOpen(!isPanelOpen);
+    };
+
     // Create initial state
     const initialChatHistory = [
         {
@@ -61,11 +159,17 @@ function ChatPanel() {
             boxSizing: 'border-box'
         }}>
             <div style={{
-                height: '20px',
+                height: '50px',
                 width: '100%',
-                backgroundColor: 'var(--yc-red)',
-                color: 'var(--fg-on-accent)',
-            }}>Close Panel</div>
+                display: 'flex',
+                alignItems: 'center',
+            }}>
+                <Button 
+                    variant="ghost" 
+                    icon={<PanelRightClose strokeWidth={1} size={24}/>}
+                    onClick={handlePanelToggle}
+                />
+            </div>
             <div style={{ 
                 flex: '1 1 auto',
                 overflowY: 'auto',
@@ -102,7 +206,62 @@ function createChatPanel() {
         border-left: 1px solid var(--border-base);
         z-index: 2000;
         box-shadow: var(--box-shadow);
+        transition: transform 0.3s ease;
     `;
+
+    const videoMetadata = getVideoMetadata();
+    console.log('Video Metadata on Panel Creation:', videoMetadata);
+
+
+    const floatingButton = document.createElement('div');
+    floatingButton.id = 'youtube-chat-floating-button';
+    floatingButton.style.cssText = `
+        position: fixed;
+        top: 50%;
+        right: 20px;
+        transform: translateY(-50%);
+        width: 40px;
+        height: 40px;
+        background-color: red;
+        border-radius: 50%;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        z-index: 2001;
+    `;
+    
+    // Create a container for the icon
+    const iconContainer = document.createElement('div');
+    iconContainer.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+    `;
+    floatingButton.appendChild(iconContainer);
+
+    // Render the PanelRightOpen icon using React
+    const iconRoot = createRoot(iconContainer);
+    iconRoot.render(<PanelRightOpen color="white" strokeWidth={1} size={24} />);
+
+    floatingButton.addEventListener('click', () => {
+        const panel = document.getElementById('youtube-chat-panel');
+        if (panel) {
+            panel.style.transform = 'translateX(0)';
+            floatingButton.style.display = 'none';
+            const primaryContainer = document.getElementById('primary');
+            const secondaryContainer = document.getElementById('secondary');
+            const pageManager = document.getElementById('page-manager');
+            if (primaryContainer) primaryContainer.style.marginRight = `${chatPanelWidth}px`;
+            if (secondaryContainer) secondaryContainer.style.marginRight = `${chatPanelWidth}px`;
+            if (pageManager) pageManager.style.marginRight = `${chatPanelWidth}px`;
+        }
+    });
+
+    document.body.appendChild(floatingButton);
 
     // Create a container for React
     const reactRoot = document.createElement('div');
