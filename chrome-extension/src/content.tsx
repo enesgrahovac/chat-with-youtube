@@ -5,6 +5,7 @@ import InputFooter from './components/InputFooter/InputFooter';
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import Button from './components/patterns/Button/Button';
 import './globals.css';
+import { ChatMessage } from './types';
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "ping") {
@@ -128,7 +129,7 @@ function ChatPanel() {
 
     const handleMessageSend = async (message: string) => {
         // Add user message
-        const userMessage = {
+        const userMessage: ChatMessage = {
             isHuman: true,
             content: message,
             timestamp: new Date()
@@ -136,17 +137,20 @@ function ChatPanel() {
         
         setChatHistory(prev => [...prev, userMessage]);
 
-        // Simulate AI response
-        const dummyAiResponse = {
-            isHuman: false,
-            content: "This is a placeholder AI response. The actual AI integration will be implemented later.",
-            timestamp: new Date()
-        };
-
-        // Add AI response after a small delay to simulate processing
-        setTimeout(() => {
-            setChatHistory(prev => [...prev, dummyAiResponse]);
-        }, 1000);
+        // Send message to background script
+        chrome.runtime.sendMessage({ action: "processMessage", chatMessages: chatHistory}, (response) => {
+            if (response && response.content) {
+                // Add AI response from background script
+                const aiResponse = {
+                    isHuman: false,
+                    content: response.content,
+                    timestamp: new Date()
+                };
+                setChatHistory(prev => [...prev, aiResponse]);
+            } else {
+                console.error('Failed to get response from background script');
+            }
+        });
     };
 
     return (
