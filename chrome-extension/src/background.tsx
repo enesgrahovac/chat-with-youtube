@@ -1,7 +1,8 @@
 import { ChatMessage, ChatGPTMessage } from './types';
 import { convertToChatGPTMessages } from './utils';
+import { DOMParser } from 'xmldom';
 
-const videoCaptionsMap = new Map<string, string | null>();
+const videoCaptionsMap = new Map<string, { captions: string | null, currentTime: number | null }>();
 
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
@@ -22,12 +23,31 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 });
 
 const callLLM = async (messages: ChatMessage[], videoId: string) => {
-    const captions = videoCaptionsMap.get(videoId);
+    const captionsData = videoCaptionsMap.get(videoId);
+    if (!captionsData || !captionsData.captions || captionsData.currentTime === null) {
+        console.error('No captions or current time available');
+        return null;
+    }
+
+    const currentTime = captionsData.currentTime;
+    const captions = captionsData.captions;
+    const contextWindowInTime = 60 * 60;
+
+    // Parse the XML captions
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(captions, "text/xml");
+    const texts = xmlDoc.getElementsByTagName("text");
+
+    // Filter captions within the time range
+    const filteredCaptions = Array.from(texts).filter(text => {
+        const start = parseFloat(text.getAttribute("start") || "0");
+        return start >= (currentTime - contextWindowInTime) && start <= (currentTime + contextWindowInTime);
+    }).map(text => text.textContent).join(' ');
+
     const chatGPTMessages = convertToChatGPTMessages(messages);
-    console.log('captions', captions);
     const systemMessage: ChatGPTMessage = {
         role: "system",
-        content: `The user is watching a youtube video with the following captions: ${captions}`
+        content: `The user is watching a YouTube video with the following captions: ${filteredCaptions}\n\n The current time the user is watching at is ${currentTime} seconds.`
     }
     const aiResponse = await callChatGPT([systemMessage, ...chatGPTMessages]);
     return aiResponse;
@@ -81,6 +101,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         return true; // Keep this to indicate async response
     }
+    else if (request.action === "updateCurrentTime") {
+        const { videoId, currentTime } = request;
+        // convert currentTime to seconds
+        // The currentTime is in the format of 00:00:00
+        const timeInSeconds: number = currentTime.split(':').map(Number).reverse().reduce((acc: number, curr: number, index: number) => acc + curr * Math.pow(60, index), 0);
+        console.log('timeInSeconds', timeInSeconds);
+
+        const existingData = videoCaptionsMap.get(videoId) || { captions: null, currentTime: null };
+        videoCaptionsMap.set(videoId, { ...existingData, currentTime: timeInSeconds });
+        console.log(`Updated current time for video ${videoId}: ${timeInSeconds}`);
+    }
     else if (request.action === "getVideoCaptions") {
         const videoId = request.videoId;
         if (request && request.videoId && request.captionUrl !== undefined) {
@@ -89,10 +120,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     if (!response.ok) {
                         throw new Error(`Failed to fetch captions: ${response.statusText}`);
                     }
-                    return response.text(); // Assuming the captions are in text format
+                    return response.text();
                 })
                 .then(captions => {
-                    videoCaptionsMap.set(request.videoId, captions);
+                    const existingData = videoCaptionsMap.get(videoId) || { captions: null, currentTime: null };
+                    videoCaptionsMap.set(videoId, { ...existingData, captions });
                     console.log('videoCaptionsMap', videoCaptionsMap);
                 })
                 .catch(error => {

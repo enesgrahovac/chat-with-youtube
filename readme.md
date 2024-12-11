@@ -13,7 +13,7 @@ run
 - [ ] make the Youtube page resize as the chat panel opens
 - [X] Ability to close/ open the chat panel
 - [X] Style the chat panel
-- [ ] Enable AI responses
+- [X] Enable AI responses
 
 # 30 minute intentions:
 
@@ -21,3 +21,4 @@ run
 - 5 December 2024: Fix styling on chat. And allow messaging and dummy responses. Maybe AI responses if time permits.
 - 6 December 2024: When user sends a message, get an AI response and show it in the chat.
 - 7 December 2024: Make the chat respond based on the video transcript.
+- 10 December 2024: Pass more metadata to the LLM, such as current time. Also, trim the transcript around the current time.

@@ -6,6 +6,9 @@ import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import Button from './components/patterns/Button/Button';
 import './globals.css';
 import { ChatMessage } from './types';
+
+const chatPanelWidth = 333;
+
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "ping") {
@@ -32,7 +35,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 //         };
 //     };
 // };
-
 function getVideoMetadata(): { videoId: string; captionUrl: string | null } | null {
     const scripts = document.querySelectorAll('script');
     let ytInitialPlayerResponse: any = undefined;
@@ -47,20 +49,16 @@ function getVideoMetadata(): { videoId: string; captionUrl: string | null } | nu
                     console.error('Failed to parse ytInitialPlayerResponse JSON:', error);
                 }
             }
-            // end the loop
             return;
         }
     });
 
     if (ytInitialPlayerResponse === undefined) {
-        // Reload the page
         window.location.reload();
         return null;
     }
 
     const videoIdFromYtInitialPlayerResponse = ytInitialPlayerResponse.videoDetails.videoId;
-
-    // if the video id from the url isn't the same as the video id in the ytInitialPlayerResponse, then reload the page
     const urlParams = new URLSearchParams(window.location.search);
     const videoIdFromUrl = urlParams.get('v');
     if (videoIdFromUrl !== videoIdFromYtInitialPlayerResponse) {
@@ -71,15 +69,22 @@ function getVideoMetadata(): { videoId: string; captionUrl: string | null } | nu
     let captionUrl: string | null = null;
     if (ytInitialPlayerResponse.captions) {
         const captionsTracks = ytInitialPlayerResponse.captions.playerCaptionsTracklistRenderer.captionTracks;
-
-        // Iterate over the captions tracks to find the one with languageCode 'en'
         const englishTrack = captionsTracks.find((track: any) => track.languageCode === 'en');
-
-        // If an English track is found, use its baseUrl, otherwise use the first track's baseUrl
         captionUrl = englishTrack ? englishTrack.baseUrl : captionsTracks[0]?.baseUrl || null;
     }
 
     return { videoId: videoIdFromYtInitialPlayerResponse, captionUrl };
+}
+
+function updateCurrentTime(videoId: string) {
+    setInterval(() => {
+        const currentTimeElement = document.querySelector('.ytp-time-current');
+        const currentTime = currentTimeElement ? currentTimeElement.textContent : null;
+
+        if (currentTime) {
+            chrome.runtime.sendMessage({ action: "updateCurrentTime", videoId, currentTime });
+        }
+    }, 1000); 
 }
 
 function ChatPanel() {
@@ -91,38 +96,62 @@ function ChatPanel() {
         const videoMetadata = getVideoMetadata();
         if (videoMetadata) {
             setVideoId(videoMetadata.videoId);
+            updateCurrentTime(videoMetadata.videoId);
         }
     }, []);
 
-    const handlePanelToggle = async () => {
+    const adjustPageLayout = (isOpen: boolean) => {
+        const elements = {
+            primary: document.getElementById('primary'),
+            secondary: document.getElementById('secondary'),
+            pageManager: document.getElementById('page-manager')
+        };
+
+        const styles = {
+            marginRight: isOpen ? `${chatPanelWidth}px` : '0',
+            width: isOpen ? `calc(100% - ${chatPanelWidth}px)` : '100%',
+            transition: 'all 0.3s ease'
+        };
+
+        Object.values(elements).forEach(element => {
+            if (element) {
+                Object.assign(element.style, styles);
+            }
+        });
+    };
+
+    adjustPageLayout(true);
+
+    const handlePanelToggle = () => {
         const panel = document.getElementById('youtube-chat-panel');
-        const primaryContainer = document.getElementById('primary');
-        const secondaryContainer = document.getElementById('secondary');
-        const pageManager = document.getElementById('page-manager');
         const floatingButton = document.getElementById('youtube-chat-floating-button');
-        const chatPanelWidth = 333;
 
         if (isPanelOpen) {
             // Close panel
             if (panel) panel.style.transform = `translateX(${chatPanelWidth}px)`;
-            if (primaryContainer) primaryContainer.style.marginRight = '0';
-            if (secondaryContainer) secondaryContainer.style.marginRight = '0';
-            if (pageManager) pageManager.style.marginRight = '0';
-            if (floatingButton) floatingButton.style.display = 'flex'; // Show floating button
-
+            if (floatingButton) floatingButton.style.display = 'flex';
+            adjustPageLayout(false);
         } else {
             // Open panel
-            console.log('Opening panel');
             if (panel) panel.style.transform = 'translateX(0)';
-            if (primaryContainer) primaryContainer.style.marginRight = `${chatPanelWidth}px`;
-            if (secondaryContainer) secondaryContainer.style.marginRight = `${chatPanelWidth}px`;
-            if (pageManager) pageManager.style.marginRight = `${chatPanelWidth}px`;
-            if (floatingButton) floatingButton.style.display = 'none'; // Hide floating button
-            console.log('Getting video metadata');
-
+            if (floatingButton) floatingButton.style.display = 'none';
+            adjustPageLayout(true);
         }
         setIsPanelOpen(!isPanelOpen);
     };
+
+    React.useEffect(() => {
+        const observer = new MutationObserver(() => {
+            adjustPageLayout(isPanelOpen);
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        return () => observer.disconnect();
+    }, [isPanelOpen]);
 
     // Create initial state
     const initialChatHistory = [
@@ -231,7 +260,7 @@ function sendVideoMetadataToBackground() {
 }
 
 function createChatPanel() {
-    const chatPanelWidth = 333;
+    sendVideoMetadataToBackground();
 
     // Check if panel already exists
     if (document.getElementById('youtube-chat-panel')) {
@@ -255,10 +284,7 @@ function createChatPanel() {
         transition: transform 0.3s ease;
     `;
 
-    const videoMetadata = sendVideoMetadataToBackground();
-
-
-
+    
     const floatingButton = document.createElement('div');
     floatingButton.id = 'youtube-chat-floating-button';
     floatingButton.style.cssText = `
@@ -335,8 +361,6 @@ function createChatPanel() {
     const secondaryContainer = document.getElementById('secondary');
     const pageManager = document.getElementById('page-manager');
 
-
-
     if (primaryContainer) {
         primaryContainer.style.marginRight = `${chatPanelWidth}px`;
         primaryContainer.style.width = `calc(100% - ${chatPanelWidth}px)`;
@@ -344,6 +368,7 @@ function createChatPanel() {
 
     if (secondaryContainer) {
         secondaryContainer.style.marginRight = `${chatPanelWidth}px`;
+        secondaryContainer.style.width = `calc(100% - ${chatPanelWidth}px)`;
     }
 
     if (pageManager) {
