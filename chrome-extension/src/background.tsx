@@ -31,7 +31,7 @@ const callLLM = async (messages: ChatMessage[], videoId: string) => {
 
     const currentTime = captionsData.currentTime;
     const captions = captionsData.captions;
-    const contextWindowInTime = 60 * 60;
+    const contextWindowInTime = 30 * 60;
 
     // Parse the XML captions
     const parser = new DOMParser();
