@@ -1,0 +1,169 @@
+.container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.contentWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chatBreak {
+  display: flex;
+  flex: 1;
+  gap: 12px;
+  align-items: center;
+}
+
+.chatBreakContent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chatBreakContent p {
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+
+.divider {
+  min-width: 32px;
+  flex: 1;
+}
+
+.icon {
+  flex: 0 0 auto;
+}
+
+.receiverAvatar,
+.senderAvatar {
+  height: 18px;
+  width: 18px;
+  border-radius: 10px;
+}
+
+.receiverAvatar {
+  background-color: var(--yc-red);
+}
+
+.senderAvatar {
+  background-color: var(--ff-brown);
+}
+
+.headerContainer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.header {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.receiverBubble,
+.senderBubble {
+  padding: 12px;
+  text-align: left;
+  border-radius: 12px;
+  border-top-left-radius: 6px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.receiverBubble {
+  background-color: var(--bg-faint);
+}
+
+.receiverBubble p {
+  color: var(--fg-base);
+}
+
+.senderBubble {
+  background-color: var(--yc-red);
+}
+
+.senderBubble p {
+  color: var(--fg-on-accent);
+}
+
+/* .onHoverModel {
+  display: none;
+} */
+
+.modelInfo {
+  display: block;
+}
+
+.modelContainer {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: 0.15s;
+}
+
+.modelContainer p {
+  color: var(--fg-faint);
+  font-size: 13px;
+}
+
+.modelContainer:hover .onHoverModel {
+  display: block;
+}
+
+.modelContainer .onHoverModel {
+  color: var(--fg-muted);
+}
+
+/* .modelContainer:hover .modelInfo {
+  display: none;
+} */
+
+.messageBubble p {
+  width: fit-content;
+}
+
+.markdown {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.markdown pre {
+  border-radius: 12px;
+  font-size: 14px;
+  margin: 0;
+  page-break-inside: avoid;
+  max-width: 100%;
+  overflow: auto;
+  display: block;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.markdown ol,
+.markdown ul {
+  padding-left: 24px; /* Add this to create space for markers */
+  margin: 0; /* Reset default margins */
+}
+
+.markdown ol li,
+.markdown ul li {
+  color: var(--fg-base);
+  padding-bottom: 8px;
+  display: list-item;
+}
+
+.markdown ol li::marker {
+  color: var(--fg-muted);
+}
+
+.markdown ul li::marker {
+  color: var(--fg-muted);
+}

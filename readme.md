@@ -14,6 +14,11 @@ run
 - [X] Ability to close/ open the chat panel
 - [X] Style the chat panel
 - [X] Enable AI responses
+- [ ] Add pre-defined prompts to select from
+- [ ] AI generate prompts in the chat
+- [ ] Add a button for "copilot" in next to the other video buttons
+- [ ] Put the chat in the HTML instead of hovering on the page
+
 
 # 30 minute intentions:
 
@@ -22,3 +27,4 @@ run
 - 6 December 2024: When user sends a message, get an AI response and show it in the chat.
 - 7 December 2024: Make the chat respond based on the video transcript.
 - 10 December 2024: Pass more metadata to the LLM, such as current time. Also, trim the transcript around the current time.
+- 18 December 2024: Adding pre-defined prompts. Starting with "summarize this video"

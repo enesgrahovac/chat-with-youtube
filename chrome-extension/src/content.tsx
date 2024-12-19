@@ -6,6 +6,7 @@ import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import Button from './components/patterns/Button/Button';
 import './globals.css';
 import { ChatMessage } from './types';
+import DefaultPrompt from './components/patterns/DefaultPrompt/DefaultPrompt';
 
 const chatPanelWidth = 333;
 
@@ -91,6 +92,7 @@ function ChatPanel() {
 
     const [isPanelOpen, setIsPanelOpen] = React.useState(true);
     const [videoId, setVideoId] = React.useState<string | null>(null);
+    const defaultPrompts = ["Summarize this video", "What is the main topic?", "Explain this part"];
 
     React.useEffect(() => {
         const videoMetadata = getVideoMetadata();
@@ -244,8 +246,25 @@ function ChatPanel() {
                 overflowY: 'auto',
                 minHeight: 0, // This is important for Firefox
             }}>
-                <ChatArea chatHistory={chatHistory} />
+                <ChatArea chatHistory={chatHistory}/>
             </div>
+            {chatHistory.length <= 1 && (
+                    <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        padding: '8px',
+                        boxSizing: 'border-box'
+                    }}>
+                        {defaultPrompts.map((prompt, index) => (
+                            <DefaultPrompt
+                                key={index}
+                                content={prompt}
+                                onClick={() => handleMessageSend(prompt)}
+                            />
+                        ))}
+                    </div>
+                )}
             <div style={{ flexShrink: 0 }}>
                 <InputFooter onMessageSend={handleMessageSend} isSendingDisabled={false} />
             </div>

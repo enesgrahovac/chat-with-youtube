@@ -7,17 +7,17 @@ interface ChatAreaProps extends React.HTMLAttributes<HTMLDivElement> {
     chatHistory: ChatMessageProps[];
     enableSmoothScroll?: boolean;
     autoScrollToBottom?: boolean;
-    onLoadMoreMessages?: () => void; // Prop to load more messages
-    onInitialScrollComplete?: () => void; 
+    onLoadMoreMessages?: () => void;
+    onInitialScrollComplete?: () => void;
 }
 
 const ChatArea = forwardRef<HTMLDivElement, ChatAreaProps>(({
-    chatHistory, 
-    className, 
-    enableSmoothScroll, 
+    chatHistory,
+    className,
+    enableSmoothScroll,
     autoScrollToBottom = true,
     onInitialScrollComplete,
-    ...rest 
+    ...rest
 }, ref) => {
     const bottomMessageRef = useRef<HTMLDivElement>(null);
 
@@ -38,8 +38,10 @@ const ChatArea = forwardRef<HTMLDivElement, ChatAreaProps>(({
         }
     }, [chatHistory, enableSmoothScroll, autoScrollToBottom]);
 
+
     return (
         <div ref={ref} className={classNames(className, styles.container)} {...rest}>
+
             {chatHistory.map((messageItem, index) => (
                 <Message key={index} {...messageItem} />
             ))}
