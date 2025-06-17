@@ -88,59 +88,6 @@ function updateCurrentTime(videoId: string) {
     }, 1000);
 }
 
-function addChatButton() {
-    // Create a new button element
-    const chatButton = document.createElement('button');
-    chatButton.className = 'ytp-button';
-    chatButton.title = 'Toggle Chat Panel';
-    chatButton.ariaLabel = 'Toggle Chat Panel';
-
-    // Create the inner div for text
-    const textDiv = document.createElement('div');
-    textDiv.className = 'ytp-fullerscreen-edu-text';
-    textDiv.textContent = '💬';
-
-    // Create the inner div for the icon
-    const iconDiv = document.createElement('div');
-    iconDiv.className = 'ytp-fullerscreen-edu-chevron';
-
-    // Create the SVG icon
-    // const svgIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    // svgIcon.setAttribute('height', '100%');
-    // svgIcon.setAttribute('viewBox', '0 0 24 24');
-    // svgIcon.setAttribute('width', '100%');
-
-    // Create the path for the SVG
-    // const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    // path.setAttribute('d', 'M7.41,8.59L12,13.17l4.59-4.58L18,10l-6,6l-6-6L7.41,8.59z');
-    // path.setAttribute('fill', '#fff');
-
-    // // Append the path to the SVG
-    // svgIcon.appendChild(path);
-
-    // Append the SVG to the icon div
-    // iconDiv.appendChild(svgIcon);
-
-    // Append the text and icon divs to the button
-    chatButton.appendChild(textDiv);
-    // chatButton.appendChild(iconDiv);
-
-    // Insert the button as the first child of the ytp-right-controls div
-    const rightControls = document.querySelector('.ytp-right-controls');
-    if (rightControls) {
-        rightControls.insertBefore(chatButton, rightControls.firstChild);
-    }
-
-    // Add event listener to toggle the chat panel
-    chatButton.addEventListener('click', () => {
-        const panel = document.getElementById('youtube-chat-panel');
-        if (panel) {
-            const isOpen = panel.style.transform !== 'translateX(0)';
-            panel.style.transform = isOpen ? 'translateX(0)' : `translateX(${chatPanelWidth}px)`;
-        }
-    });
-}
-
 function ChatPanel() {
 
     const [isPanelOpen, setIsPanelOpen] = React.useState(true);
@@ -148,7 +95,6 @@ function ChatPanel() {
     const defaultPrompts = ["Summarize this video", "What is the main topic?", "Explain this part"];
 
     React.useEffect(() => {
-        addChatButton();
         const videoMetadata = getVideoMetadata();
         if (videoMetadata) {
             setVideoId(videoMetadata.videoId);

@@ -1,0 +1,8 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+This is a chrome extension that opens when the user is watching a YouTube video. It opens as a chat panel on the right-hand side of their screen. This code is open-sourced and should have security in mind when handling a user's inputted API keys or other personal information. As this isn't a hosted application, practically all of the functionality must be client-side.
+
+Avoid technical debt. Don't make short-term changes for quick fixes. Instead, think deeply about a problem and read as much related code to avoid accruing technical debt.

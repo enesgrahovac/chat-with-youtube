@@ -18,6 +18,7 @@ run
 - [ ] AI generate prompts in the chat
 - [ ] Add a button for "copilot" in next to the other video buttons
 - [ ] Put the chat in the HTML instead of hovering on the page
+- [ ] Clear chat history button
 
 
 # 30 minute intentions:
