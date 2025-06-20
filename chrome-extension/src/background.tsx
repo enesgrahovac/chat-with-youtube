@@ -64,7 +64,7 @@ const callChatGPT = async (messages: ChatGPTMessage[]) => {
                 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
             },
             body: JSON.stringify({
-                model: "gpt-4o",
+                model: "gpt-4.1-nano",
                 messages
             })
         });

@@ -13,6 +13,8 @@ const chatPanelWidth = 360;
 const MIN_CHAT_WIDTH = chatPanelWidth; // absolute minimum
 const COLLAPSE_THRESHOLD = MIN_CHAT_WIDTH * 0.4; // 60% smaller than min triggers collapse
 const baseZIndex = 1900;
+const marginTop = 56;
+
 let lastSavedWidth = chatPanelWidth;
 
 let isChatOpen = true;
@@ -23,64 +25,146 @@ function dispatchResizeThrottled() {
     resizeThrottleId = window.setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
         resizeThrottleId = null;
-    }, 1000); // 1 fps
+    }, 500); // 2 fps
+}
+
+function updatePageContentShift(width: number) {
+    const ytdApp = document.querySelector('ytd-app') as HTMLElement | null;
+    if (!ytdApp) return;
+
+    // Shift content visually and also shrink its actual width so YouTube's own
+    // responsive logic (ResizeObserver + CSS breakpoints) reacts as if the
+    // browser window itself had become narrower.
+    ytdApp.style.marginRight = `${width}px`;
+
+    // After adjusting the visual width, also mirror YouTube's own responsive attribute
+    // behaviour so that the layout (e.g. single-column vs two-column) switches just
+    // like it does when the browser window itself is resized.
+    updateFlexyBreakpoints(window.innerWidth - width);
+}
+
+/**
+ * Mimic YouTube's internal responsive logic by toggling attributes on
+ * <ytd-watch-flexy>. This is a heuristic based on observed breakpoints.
+ */
+function updateFlexyBreakpoints(availableWidth: number) {
+    const flexy = document.querySelector('ytd-watch-flexy') as HTMLElement | null;
+    if (!flexy) return;
+
+    // Large vs small window flags (~1330px breakpoint).
+    if (availableWidth >= 1330) {
+        flexy.setAttribute('flexy-large-window_', '');
+        flexy.removeAttribute('flexy-small-window_');
+    } else {
+        flexy.removeAttribute('flexy-large-window_');
+        flexy.setAttribute('flexy-small-window_', '');
+    }
+
+    // Two-column layout flag (~1000px breakpoint).
+    if (availableWidth >= 1000) {
+        flexy.setAttribute('is-two-columns_', '');
+    } else {
+        flexy.removeAttribute('is-two-columns_');
+    }
 }
 
 function toggleChatPanel(open: boolean) {
-    const wrapper = document.getElementById('yt-chat-wrapper');
-    const openTab = document.getElementById('yt-chat-open-tab');
-    const placeholder = document.getElementById('youtube-chat-panel-placeholder');
+    const wrapper = document.getElementById('yt-chat-wrapper') as HTMLElement | null;
+    const openTab = document.getElementById('yt-chat-open-tab') as HTMLElement | null;
     if (!wrapper) return;
 
     isChatOpen = open;
+
+    // Persist the open/closed state so it survives page navigations and refreshes
+    chrome.storage.local.set({ chatPanelOpen: open });
+
     if (open) {
-        // retrieve stored width
         chrome.storage.local.get(['chatPanelWidth'], (data) => {
             const width = data.chatPanelWidth ? data.chatPanelWidth : lastSavedWidth;
             lastSavedWidth = width;
-            const targetWidth = `${width}px`;
-            wrapper.style.setProperty('--yt-chat-width', targetWidth);
-            if (placeholder) {
-                placeholder.style.flexBasis = targetWidth;
-                placeholder.style.width = targetWidth;
-            }
+            wrapper.style.setProperty('--yt-chat-width', `${width}px`);
+            wrapper.style.width = `${width}px`;
+            updatePageContentShift(width);
         });
     } else {
-        const targetWidth = '0px';
-        wrapper.style.setProperty('--yt-chat-width', targetWidth);
-        if (placeholder) {
-            placeholder.style.flexBasis = targetWidth;
-            placeholder.style.width = targetWidth;
-        }
+        wrapper.style.setProperty('--yt-chat-width', `0px`);
+        wrapper.style.width = `0px`;
+        updatePageContentShift(0);
     }
 
     if (openTab) openTab.style.display = open ? 'none' : 'flex';
 
-    // Notify YouTube player to recalculate layout
+    // still notify for good measure
     window.dispatchEvent(new Event('resize'));
 }
 
 function ensureOpenTab() {
     if (document.getElementById('yt-chat-open-tab')) return;
-    const wrapper = document.getElementById('yt-chat-wrapper');
-    if (!wrapper) return;
 
     const openTab = document.createElement('div');
     openTab.id = 'yt-chat-open-tab';
-    const zIndex = baseZIndex + 1;
+
+    const openButtonMargin = 6;
+    // Custom tooltip (uses YouTube-like styling)
+    const tooltipOuter = document.createElement('div');
+    tooltipOuter.style.cssText = `
+        position: fixed;
+        right: 58px; /* tab width (42) + margin (6) + 10px */
+        top: ${openButtonMargin + marginTop}px;  /* roughly vertically centred on the tab */
+        z-index: ${baseZIndex};
+        pointer-events: none;
+        display: none;
+    `;
+
+    const tooltipInner = document.createElement('div');
+    tooltipInner.style.cssText = `
+        background: #fff;
+        color: #000;
+        font-family: Roboto, Arial, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 8px 10px;
+        border: 1px solid rgba(0,0,0,0.15);
+        border-radius: 2px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        white-space: nowrap;
+        position: relative;
+    `;
+    tooltipInner.textContent = 'Open YouTube Copilot chat';
+
+    // caret
+    const caret = document.createElement('div');
+    caret.style.cssText = `
+        position: absolute;
+        top: 50%;
+        right: -6px;
+        margin-top: -6px;
+        width: 0;
+        height: 0;
+        border-top: 6px solid transparent;
+        border-bottom: 6px solid transparent;
+        border-left: 6px solid #fff;
+    `;
+    tooltipInner.appendChild(caret);
+    tooltipOuter.appendChild(tooltipInner);
+    document.body.appendChild(tooltipOuter);
+
     openTab.style.cssText = `
         width: 42px;
-        height: 96px;
+        height: 42px;
+        margin: ${openButtonMargin}px;
+        border-radius: 6px;
         background: var(--bg-base, #fff);
         border-left: 1px solid var(--border-base, rgba(0,0,0,0.1));
         display: none;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        position: sticky;
-        top: 56px;
-        z-index: ${zIndex};
-        opacity: 1;
+        position: fixed;
+        right: 0;
+        top: ${marginTop}px;
+        z-index: ${baseZIndex + 1};
+        opacity: .6;
         transition: opacity .2s ease;
     `;
 
@@ -89,15 +173,20 @@ function ensureOpenTab() {
     );
 
     openTab.addEventListener('mouseenter', () => {
-        openTab.style.opacity = '.6';
+        openTab.style.opacity = '1';
+        tooltipOuter.style.display = 'block';
     });
     openTab.addEventListener('mouseleave', () => {
-        openTab.style.opacity = '1';
+        openTab.style.opacity = '.6';
+        tooltipOuter.style.display = 'none';
     });
 
-    openTab.addEventListener('click', () => toggleChatPanel(true));
+    openTab.addEventListener('click', () => {
+        tooltipOuter.style.display = 'none';
+        toggleChatPanel(true);
+    });
 
-    wrapper.appendChild(openTab);
+    document.body.appendChild(openTab);
 }
 
 function ensureResizeHandle() {
@@ -154,13 +243,11 @@ function ensureResizeHandle() {
         const tentative = startWidth + delta;
         if (tentative < COLLAPSE_THRESHOLD) draggedBelowMin = true;
         const newWidth = Math.min(Math.max(tentative, MIN_CHAT_WIDTH), window.innerWidth * 0.5);
-        const wrapper = document.getElementById('yt-chat-wrapper');
-        const placeholder = document.getElementById('youtube-chat-panel-placeholder');
-        if (wrapper && placeholder) {
+        const wrapper = document.getElementById('yt-chat-wrapper') as HTMLElement | null;
+        if (wrapper) {
             wrapper.style.setProperty('--yt-chat-width', `${newWidth}px`);
-            placeholder.style.flexBasis = `${newWidth}px`;
-            placeholder.style.width =
-                `${newWidth}px`;
+            wrapper.style.width = `${newWidth}px`;
+            updatePageContentShift(newWidth);
             dispatchResizeThrottled();
             currentWidth = newWidth;
         }
@@ -235,16 +322,13 @@ function mountChatPanelIntoPlaceholder() {
     ensureOpenTab();
     ensureResizeHandle();
 
-    // Load stored width if present
-    chrome.storage.local.get(['chatPanelWidth'], (data) => {
+    // Load stored width and open state
+    chrome.storage.local.get(['chatPanelWidth', 'chatPanelOpen'], (data) => {
         if (data.chatPanelWidth) {
             lastSavedWidth = data.chatPanelWidth;
-            const targetWidth = `${lastSavedWidth}px`;
-            const wrapper = document.getElementById('yt-chat-wrapper');
-            if (wrapper) wrapper.style.setProperty('--yt-chat-width', targetWidth);
-            placeholder.style.flexBasis = targetWidth;
-            placeholder.style.width = targetWidth;
         }
+        const shouldOpen = data.chatPanelOpen !== undefined ? data.chatPanelOpen : true;
+        toggleChatPanel(shouldOpen);
     });
 
     sendVideoMetadataToBackground();
@@ -495,132 +579,46 @@ function injectFlexWrapper() {
         return;
     }
 
-    const tryInject = (): boolean => {
-        const pageManager = document.getElementById('page-manager');
-        if (pageManager && pageManager.parentElement) {
-            const parent = pageManager.parentElement;
+    const wrapper = document.createElement('div');
+    wrapper.id = 'yt-chat-wrapper';
+    wrapper.style.cssText = `
+        position: fixed;
+        right: 0;
+        top: ${marginTop}px;
+        height: calc(100vh - ${marginTop}px);
+        width: var(--yt-chat-width, 0px); /* start collapsed to avoid flash */
+        display: flex;
+        z-index: ${baseZIndex};
+    `;
+    wrapper.style.setProperty('--yt-chat-width', `0px`);
 
-            // Build wrapper
-            const wrapper = document.createElement('div');
-            wrapper.id = 'yt-chat-wrapper';
-            wrapper.style.cssText = `
-                display: flex;
-                width: 100%;
-                align-items: stretch;
-            `;
-            wrapper.style.setProperty('--yt-chat-width', `${chatPanelWidth}px`);
+    const placeholderPanel = document.createElement('div');
+    placeholderPanel.id = 'youtube-chat-panel-placeholder';
+    placeholderPanel.style.cssText = `
+        width: 100%;
+        height: 100%;
+        overflow-y: hidden;
+        background: var(--bg-base, #fff);
+        border-left: 1px solid var(--border-base, rgba(0,0,0,0.1));
+    `;
 
-            parent.insertBefore(wrapper, pageManager);
-            wrapper.appendChild(pageManager);
+    wrapper.appendChild(placeholderPanel);
+    document.body.appendChild(wrapper);
 
-            const placeholderPanel = document.createElement('div');
-            placeholderPanel.id = 'youtube-chat-panel-placeholder';
-            placeholderPanel.style.cssText = `
-                flex: 0 0 var(--yt-chat-width, 320px);
-                position: sticky;
-                top: 56px;
-                height: calc(100vh - 56px);
-                overflow-y: hidden;
-                background: var(--bg-base, #fff);
-                border-left: 1px solid var(--border-base, rgba(0,0,0,0.1));
-                z-index: ${baseZIndex};
-            `;
+    // Do not shift content yet; mountChatPanelIntoPlaceholder() will
+    // decide whether to expand and shift based on persisted state.
 
-            wrapper.appendChild(placeholderPanel);
-
-            // Ensure main content can shrink properly next to our fixed-width panel
-            (pageManager as HTMLElement).style.flex = '1 1 auto';
-            (pageManager as HTMLElement).style.minWidth = '0';
-
-            console.info('[YT-Chat] Flex wrapper injected beside #page-manager.');
-
-            mountChatPanelIntoPlaceholder();
-
-            // Inject style fixes once
-            if (!document.getElementById('yt-chat-fixes')) {
-                const style = document.createElement('style');
-                style.id = 'yt-chat-fixes';
-                style.textContent = `
-                    ytd-watch-metadata {
-                        max-width: 100% !important;
-                        flex: 1 1 auto !important;
-                        min-width: 0 !important;
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-
-            return true;
-        }
-
-        // Fallback to #columns if page-manager not ready
-        const columnsEl = document.getElementById('columns');
-        if (!columnsEl || !columnsEl.parentElement) {
-            return false;
-        }
-
-        const wrapper = document.createElement('div');
-        wrapper.id = 'yt-chat-wrapper';
-        wrapper.style.cssText = `
-            display: flex;
-            width: 100%;
-            align-items: stretch;
+    // inject smooth transition once
+    if (!document.getElementById('yt-chat-shift-transition')) {
+        const style = document.createElement('style');
+        style.id = 'yt-chat-shift-transition';
+        style.textContent = `
+            ytd-app { transition: margin-right .2s ease; }
         `;
-        wrapper.style.setProperty('--yt-chat-width', `${chatPanelWidth}px`);
-
-        const parent = columnsEl.parentElement;
-        parent.insertBefore(wrapper, columnsEl);
-        wrapper.appendChild(columnsEl);
-
-        (columnsEl as HTMLElement).style.flex = '1 1 auto';
-        (columnsEl as HTMLElement).style.minWidth = '0';
-
-        const placeholderPanel = document.createElement('div');
-        placeholderPanel.id = 'youtube-chat-panel-placeholder';
-        placeholderPanel.style.cssText = `
-            flex: 0 0 var(--yt-chat-width, 320px);
-            position: sticky;
-            top: 56px;
-            height: calc(100vh - 56px);
-            overflow-y: hidden;
-            background: var(--bg-base, #fff);
-            border-left: 1px solid var(--border-base, rgba(0,0,0,0.1));
-            z-index: ${baseZIndex};
-        `;
-
-        wrapper.appendChild(placeholderPanel);
-
-        console.info('[YT-Chat] Flex wrapper injected beside #columns (fallback).');
-
-        mountChatPanelIntoPlaceholder();
-
-        if (!document.getElementById('yt-chat-fixes')) {
-            const style = document.createElement('style');
-            style.id = 'yt-chat-fixes';
-            style.textContent = `
-                ytd-watch-metadata {
-                    max-width: 100% !important;
-                    flex: 1 1 auto !important;
-                    min-width: 0 !important;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-
-        return true;
-    };
-
-    // Attempt immediately; if it fails, observe DOM until #columns appears.
-    if (tryInject()) {
-        return;
+        document.head.appendChild(style);
     }
 
-    const obs = new MutationObserver(() => {
-        if (tryInject()) {
-            obs.disconnect();
-        }
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
+    mountChatPanelIntoPlaceholder();
 }
 
 // Keyboard shortcut Alt + C to toggle panel
@@ -628,4 +626,12 @@ window.addEventListener('keydown', (e) => {
     if (e.altKey && e.code === 'KeyC') {
         toggleChatPanel(!isChatOpen);
     }
+});
+
+// Ensure breakpoints update on any window resize (initial resize events are dispatched by the
+// extension itself when the panel opens/closes or is dragged).
+window.addEventListener('resize', () => {
+    const wrapper = document.getElementById('yt-chat-wrapper') as HTMLElement | null;
+    const chatWidth = wrapper ? parseInt(getComputedStyle(wrapper).getPropertyValue('--yt-chat-width')) || 0 : 0;
+    updateFlexyBreakpoints(window.innerWidth - chatWidth);
 });
