@@ -502,8 +502,14 @@ function ChatPanel() {
     ];
 
     const [chatHistory, setChatHistory] = React.useState(initialChatHistory);
+    // Flag (state) to disable UI and a ref for immediate synchronous checks
+    const [isWaitingForResponse, setIsWaitingForResponse] = React.useState(false);
+    const waitingForResponseRef = React.useRef(false);
 
     const handleMessageSend = async (message: string) => {
+        // Prevent sending if we are already waiting for a response (ref ensures immediate check before asynchronous state update)
+        if (waitingForResponseRef.current) return;
+
         // Add user message
         const userMessage: ChatMessage = {
             isHuman: true,
@@ -535,13 +541,22 @@ function ChatPanel() {
             dotCount = dotCount === 3 ? 1 : dotCount + 1;
         }, 500); // Update every 500ms
 
+        // Mark that we're now waiting for the AI reply
+        setIsWaitingForResponse(true);
+        waitingForResponseRef.current = true;
+
         // Send message to background script
         chrome.runtime.sendMessage({ action: "processMessage", chatMessages: newChatHistory, videoId: videoId }, (response) => {
             // Stop the animation
             clearInterval(intervalId);
 
-            // Remove the last message (placeholder)
-            setChatHistory(prev => prev.slice(0, -1));
+            // Remove the last message (placeholder) **only if it is actually the placeholder**
+            setChatHistory(prev => {
+                const last = prev[prev.length - 1];
+                // Placeholder messages are non-human and contain only dots (one to three)
+                const isPlaceholder = last && !last.isHuman && /^\.{1,3}$/.test(last.content);
+                return isPlaceholder ? prev.slice(0, -1) : prev;
+            });
 
             if (response && response.content) {
                 // Add AI response from background script
@@ -554,6 +569,10 @@ function ChatPanel() {
             } else {
                 console.error('Failed to get response from background script');
             }
+
+            // Re-enable sending after response processing (success or failure)
+            waitingForResponseRef.current = false;
+            setIsWaitingForResponse(false);
         });
     };
 
@@ -603,7 +622,7 @@ function ChatPanel() {
                 </div>
             )}
             <div style={{ flexShrink: 0 }}>
-                <InputFooter onMessageSend={handleMessageSend} isSendingDisabled={false} />
+                <InputFooter onMessageSend={handleMessageSend} isSendingDisabled={isWaitingForResponse} />
             </div>
         </div>
     );
