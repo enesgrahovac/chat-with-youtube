@@ -6,7 +6,8 @@
         "activeTab",
         "scripting",
         "storage",
-        "tabs"
+        "tabs",
+        "webRequest"
     ],
     "icons": {
         "48": "icon.png",

@@ -358,26 +358,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-// type YtInitialPlayerResponse = {
-//     videoDetails: {
-//         videoId: string;
-//     };
-//     captions?: {
-//         playerCaptionsTracklistRenderer: {
-//             captionTracks: Array<{
-//                 languageCode: string;
-//                 baseUrl: string;
-//             }>;
-//         };
-//     };
-// };
 function getVideoMetadata(): { videoId: string; captionUrl: string | null } | null {
     const scripts = document.querySelectorAll('script');
     let ytInitialPlayerResponse: any = undefined;
 
     scripts.forEach(script => {
         if (script.textContent && script.textContent.includes('ytInitialPlayerResponse')) {
-            const jsonString = script.textContent.match(/ytInitialPlayerResponse\s*=\s*(\{.*?\});/);
+            // Capture the full (multi-line) ytInitialPlayerResponse assignment. The dotAll flag (/s)
+            // lets the dot match newlines, and the non-greedy quantifier prevents overshooting.
+            // We intentionally stop right before the next "var meta" statement that YouTube inserts
+            // after the player response.
+            const jsonString = script.textContent.match(/ytInitialPlayerResponse\s*=\s*({[\s\S]*?})(?=;\s*var\s+meta\s*=)/);
             if (jsonString && jsonString[1]) {
                 try {
                     ytInitialPlayerResponse = JSON.parse(jsonString[1]);
@@ -406,7 +397,15 @@ function getVideoMetadata(): { videoId: string; captionUrl: string | null } | nu
     if (ytInitialPlayerResponse.captions) {
         const captionsTracks = ytInitialPlayerResponse.captions.playerCaptionsTracklistRenderer.captionTracks;
         const englishTrack = captionsTracks.find((track: any) => track.languageCode === 'en');
-        captionUrl = englishTrack ? englishTrack.baseUrl : captionsTracks[0]?.baseUrl || null;
+
+        const chosenTrack = englishTrack ?? captionsTracks[0];
+        if (chosenTrack) {
+            // Prefer the fully-featured JSON3 URL if present (handles ASR tracks)
+            captionUrl = chosenTrack.url || chosenTrack.baseUrl || null;
+
+            // If the track only gives us baseUrl, leave it untouched (XML). The URL form that already
+            // contains fmt=json3 also carries the required pot/potc tokens, so we must not mutate it.
+        }
     }
 
     return { videoId: videoIdFromYtInitialPlayerResponse, captionUrl };
@@ -423,6 +422,37 @@ function updateCurrentTime(videoId: string) {
     }, 1000);
 }
 
+/**
+ * Waits until any preroll advertisement has finished playing before resolving.
+ * It observes the presence of the `ad-showing` class on YouTube's main
+ * `.html5-video-player` element.
+ * If no ad is currently showing, the promise resolves immediately.
+ * A safety timeout ensures the promise always resolves within `timeoutMs`.
+ */
+function waitForAdToFinish(timeoutMs = 30000): Promise<void> {
+    return new Promise((resolve) => {
+        const player = document.querySelector('.html5-video-player') as HTMLElement | null;
+        if (!player || !player.classList.contains('ad-showing')) {
+            resolve(); // No ad playing – continue immediately
+            return;
+        }
+
+        const pollInterval = 500;
+        const intervalId = setInterval(() => {
+            if (!player.classList.contains('ad-showing')) {
+                clearInterval(intervalId);
+                clearTimeout(timeoutId);
+                resolve();
+            }
+        }, pollInterval);
+
+        const timeoutId = setTimeout(() => {
+            clearInterval(intervalId);
+            resolve();
+        }, timeoutMs);
+    });
+}
+
 function ChatPanel() {
 
     const [isPanelOpen, setIsPanelOpen] = React.useState(true);
@@ -434,6 +464,25 @@ function ChatPanel() {
         if (videoMetadata) {
             setVideoId(videoMetadata.videoId);
             updateCurrentTime(videoMetadata.videoId);
+
+            // Trigger CC network request *after* any preroll ad has finished so we capture
+            // captions for the actual video rather than the advertisement.
+            waitForAdToFinish().then(() => {
+                // Wait a bit for the player controls to render.
+                setTimeout(() => {
+                    const ccButton = document.querySelector<HTMLButtonElement>('.ytp-subtitles-button');
+                    if (ccButton) {
+                        const initiallyPressed = ccButton.getAttribute('aria-pressed') === 'true';
+                        if (!initiallyPressed) {
+                            ccButton.click(); // turn on
+                            // turn off after a short delay so viewer settings stay unchanged
+                            setTimeout(() => {
+                                ccButton.click();
+                            }, 1200);
+                        }
+                    }
+                }, 1000);
+            });
         }
 
     }, []);

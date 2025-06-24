@@ -1,6 +1,5 @@
 import { ChatMessage, ChatGPTMessage } from './types';
-import { convertToChatGPTMessages } from './utils';
-import { DOMParser } from 'xmldom';
+import { convertToChatGPTMessages, captionsToXML } from './utils';
 
 const videoCaptionsMap = new Map<string, { captions: string | null, currentTime: number | null }>();
 
@@ -25,29 +24,22 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 const callLLM = async (messages: ChatMessage[], videoId: string) => {
     const captionsData = videoCaptionsMap.get(videoId);
     if (!captionsData || !captionsData.captions || captionsData.currentTime === null) {
-        console.error('No captions or current time available');
-        return null;
+        console.warn('[YT-Chat] Captions not yet available – likely because an advertisement is still playing or captions have not loaded.');
+
+        // Craft a helpful fallback response for the user. We bypass the LLM call to save tokens.
+        return "I'm still waiting for the video's captions to load (an advertisement may still be playing). Please let the video start, then ask again.";
     }
 
     const currentTime = captionsData.currentTime;
     const captions = captionsData.captions;
     const contextWindowInTime = 30 * 60;
 
-    // Parse the XML captions
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(captions, "text/xml");
-    const texts = xmlDoc.getElementsByTagName("text");
-
-    // Filter captions within the time range
-    const filteredCaptions = Array.from(texts).filter(text => {
-        const start = parseFloat(text.getAttribute("start") || "0");
-        return start >= (currentTime - contextWindowInTime) && start <= (currentTime + contextWindowInTime);
-    }).map(text => text.textContent).join(' ');
-
+    const captionsXML = captionsToXML(captions, currentTime, contextWindowInTime);
+    console.log('captionsXML', captionsXML);
     const chatGPTMessages = convertToChatGPTMessages(messages);
     const systemMessage: ChatGPTMessage = {
         role: "system",
-        content: `The user is watching a YouTube video with the following captions: ${filteredCaptions}\n\n The current time the user is watching at is ${currentTime} seconds.`
+        content: `The user is watching a YouTube video. Captions XML:\n${captionsXML}\n\nCurrent time: ${currentTime} seconds.`
     }
     const aiResponse = await callChatGPT([systemMessage, ...chatGPTMessages]);
     return aiResponse;
@@ -113,24 +105,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         console.log(`Updated current time for video ${videoId}: ${timeInSeconds}`);
     }
     else if (request.action === "getVideoCaptions") {
-        const videoId = request.videoId;
-        if (request && request.videoId && request.captionUrl !== undefined) {
-            fetch(request.captionUrl)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch captions: ${response.statusText}`);
-                    }
-                    return response.text();
-                })
-                .then(captions => {
-                    const existingData = videoCaptionsMap.get(videoId) || { captions: null, currentTime: null };
-                    videoCaptionsMap.set(videoId, { ...existingData, captions });
-                    console.log('videoCaptionsMap', videoCaptionsMap);
-                })
-                .catch(error => {
-                    console.error('Error fetching video captions:', error);
-                });
-        }
+        // const videoId = request.videoId;
+        // if (request && request.videoId && request.captionUrl !== undefined) {
+        //     fetch(request.captionUrl, { credentials: 'include' })
+        //         .then(response => {
+        //             if (!response.ok) {
+        //                 throw new Error(`Failed to fetch captions: ${response.statusText}`);
+        //             }
+        //             return response.text();
+        //         })
+        //         .then(captions => {
+        //             const existingData = videoCaptionsMap.get(videoId) || { captions: null, currentTime: null };
+        //             videoCaptionsMap.set(videoId, { ...existingData, captions });
+        //             console.log('videoCaptionsMap', videoCaptionsMap);
+        //         })
+        //         .catch(error => {
+        //             console.error('Error fetching video captions:', error);
+        //         });
+        // }
     }
 });
 
@@ -161,4 +153,39 @@ function verifyContentScript(tabId: number, callback: () => void, retries = 3, d
         }
     });
 }
+
+// Observe caption requests and harvest the fully-signed URL (includes pot/potc).
+chrome.webRequest.onCompleted.addListener(
+    (details) => {
+        try {
+            const url = details.url;
+            if (!url.includes('/api/timedtext')) return;
+            console.log("incoming details", details)
+
+            const urlObj = new URL(url);
+            const videoId = urlObj.searchParams.get('v');
+            if (!videoId) return;
+
+            const existing = videoCaptionsMap.get(videoId);
+            if (existing && existing.captions) return; // already cached
+
+            // Fetch the captions with cookies so it succeeds regardless of tokens.
+            fetch(url, { credentials: 'include' })
+                .then(resp => {
+                    if (!resp.ok) throw new Error(`captions fetch failed: ${resp.status}`);
+                    return resp.text();
+                })
+                .then(text => {
+                    const prev = videoCaptionsMap.get(videoId) || { captions: null, currentTime: null };
+                    console.log('text', text)
+                    videoCaptionsMap.set(videoId, { ...prev, captions: text });
+                    console.log('[YT-Chat] Captions harvested via webRequest', videoId);
+                })
+                .catch(err => console.error('[YT-Chat] Captions harvest error', err));
+        } catch (err) {
+            console.error('[YT-Chat] webRequest processing error', err);
+        }
+    },
+    { urls: ['*://www.youtube.com/api/timedtext*'] }
+);
 
