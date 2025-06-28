@@ -210,27 +210,42 @@ function ensureResizeHandle() {
         transition: opacity .2s ease;
         z-index: ${zIndex};
         pointer-events: auto;
+        padding-right: 4px;
     `;
 
     // inner visual line
     const grip = document.createElement('span');
     grip.style.cssText = `
         position:absolute;
-        left:50%;
-        top:50%;
-        transform: translate(-50%, -50%);
-        width:4px;
-        height:40px;
-        border-radius:4px;
-        background: rgba(255,0,0,.63);
+        left:0;
+        height: 100%;
+        width:6px;
+        border-radius:1px;
+        background: transparent;
+        transition: background-color .2s ease;
     `;
     handle.appendChild(grip);
 
+    let hoverTimeout: number | null = null;
+    let isDragging = false;
+
     handle.addEventListener('mouseenter', () => {
         handle.style.opacity = '1';
+        // Set timeout to show red grip after .3 second
+        hoverTimeout = window.setTimeout(() => {
+            grip.style.background = 'rgba(255,0,0,.63)';
+        }, 300);
     });
     handle.addEventListener('mouseleave', () => {
         handle.style.opacity = '0';
+        // Clear timeout and hide red grip (but only if not dragging)
+        if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = null;
+        }
+        if (!isDragging) {
+            grip.style.background = 'transparent';
+        }
     });
 
     let startX = 0;
@@ -266,6 +281,13 @@ function ensureResizeHandle() {
         // restore user select and final resize
         window.dispatchEvent(new Event('resize'));
 
+        // End drag state and reset grip color if not hovering
+        isDragging = false;
+        const isHovering = handle.matches(':hover');
+        if (!isHovering) {
+            grip.style.background = 'transparent';
+        }
+
         if (draggedBelowMin) {
             draggedBelowMin = false;
             toggleChatPanel(false);
@@ -285,6 +307,14 @@ function ensureResizeHandle() {
             const current = parseInt(getComputedStyle(wrapper).getPropertyValue('--yt-chat-width'));
             startWidth = isNaN(current) ? chatPanelWidth : current;
         }
+
+        // Start drag state and immediately show red grip
+        isDragging = true;
+        if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = null;
+        }
+        grip.style.background = 'rgba(255,0,0,.63)';
 
         // disable text selection during drag
         prevUserSelect = document.body.style.userSelect;
@@ -455,7 +485,6 @@ function waitForAdToFinish(timeoutMs = 30000): Promise<void> {
 
 function ChatPanel() {
 
-    const [isPanelOpen, setIsPanelOpen] = React.useState(true);
     const [videoId, setVideoId] = React.useState<string | null>(null);
     const defaultPrompts = ["Summarize this video", "What is the main topic?", "Explain this part"];
 
