@@ -47,32 +47,57 @@ const callLLM = async (messages: ChatMessage[], videoId: string) => {
 
 const callChatGPT = async (messages: ChatGPTMessage[]) => {
     console.log('messages to chatGpt', messages);
-    try {
-        console.log('Calling ChatGPT', process.env.OPENAI_API_KEY);
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: "gpt-4.1-nano",
-                messages
-            })
+
+    // Get API key from secure storage
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['openai_api_key'], async (result) => {
+            const apiKey = result.openai_api_key;
+
+            if (!apiKey) {
+                console.error('No OpenAI API key found. Please configure it in the extension popup.');
+                resolve('Please configure your OpenAI API key. [Open settings](#open-settings)');
+                return;
+            }
+
+            try {
+                console.log('Calling ChatGPT with stored API key');
+                const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: "gpt-4o-mini",
+                        messages
+                    })
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Invalid API key
+                        chrome.storage.local.set({
+                            api_key_status: {
+                                isValid: false,
+                                lastTested: new Date().toISOString()
+                            }
+                        });
+                        resolve('Your OpenAI API key appears to be invalid. [Open settings](#open-settings)');
+                        return;
+                    }
+                    throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('ChatGPT response received');
+                const aiResponse = data.choices[0].message.content;
+                resolve(aiResponse);
+            } catch (error) {
+                console.error('Failed to call ChatGPT:', error);
+                resolve('Sorry, I encountered an error while processing your request. Please try again.');
+            }
         });
-
-        if (!response.ok) {
-            throw new Error(JSON.stringify({ error: response.statusText, body: response.body }));
-        }
-
-        const data = await response.json();
-        console.log('ChatGPT response', data);
-        const aiResponse = data.choices[0].message.content;
-        return aiResponse; // Assuming the API returns the response in a JSON format
-    } catch (error) {
-        console.error('Failed to call ChatGPT:', error);
-        return null;
-    }
+    });
 };
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -123,6 +148,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         //             console.error('Error fetching video captions:', error);
         //         });
         // }
+    }
+    else if (request.action === "openPopup") {
+        // Opens the extension's popup programmatically (Chrome 109+)
+        if (chrome.action && (chrome.action as any).openPopup) {
+            (chrome.action as any).openPopup();
+        }
     }
 });
 

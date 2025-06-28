@@ -1,12 +1,154 @@
 <!doctype html>
 <html>
+
 <head>
-  <meta charset="utf-8">
-  <title>Popup</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <script defer src="popup.js"></script>
+    <meta charset="utf-8">
+    <title>Popup Test</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body {
+            width: 360px;
+            height: 400px;
+            margin: 0;
+            padding: 16px;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #007cba;
+        }
+
+        .header {
+            color: #007cba;
+            margin: 0 0 16px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+
+        .button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .button:hover {
+            background: #005a8b;
+        }
+
+        /* External link styling */
+        .external-link {
+            color: #007cba;
+            text-decoration: none;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.15s ease;
+        }
+
+        .external-link:hover {
+            color: #005a8b;
+            text-decoration: underline;
+        }
+
+        .external-link svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+    </style>
 </head>
+
 <body>
-  <div id="root"></div> <!-- This is where your React app will attach -->
+    <div class="container">
+        <h1 class="header">🔑 Vanilla HTML Popup Test</h1>
+        <p>If you can see this, the popup mechanism works!</p>
+        <p>The issue is with React mounting.</p>
+        <input type="text" class="input" placeholder="Enter your OpenAI API key (sk-...)" id="apiKey">
+        <button class="button" onclick="handleSave()">Save API Key</button>
+        <div id="status"
+            style="margin-top: 16px; padding: 8px; background: #e6f3ff; border-radius: 4px; display: none;">
+            Status will appear here
+        </div>
+        <div>
+            <span>
+                <a class="external-link" href="https://platform.openai.com/api-keys" target="_blank"
+                    rel="noopener noreferrer">
+                    <span>Get an API key</span>
+                    <!-- simple external-link icon -->
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M14 3h7v7h-2V6.414l-9.293 9.293-1.414-1.414L17.586 5H14V3z" />
+                        <path d="M5 5h5V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5h-2v5H5V5z" />
+                    </svg>
+                </a>
+            </span>
+        </div>
+    </div>
+
+    <script>
+        console.log('Popup script loaded');
+
+        function handleSave() {
+            const apiKey = document.getElementById('apiKey').value;
+            const status = document.getElementById('status');
+
+            if (!apiKey.trim()) {
+                status.style.display = 'block';
+                status.style.background = '#ffe6e6';
+                status.textContent = 'Please enter an API key';
+                return;
+            }
+
+            if (!apiKey.startsWith('sk-')) {
+                status.style.display = 'block';
+                status.style.background = '#ffe6e6';
+                status.textContent = 'Invalid API key format. Must start with "sk-"';
+                return;
+            }
+
+            // Save to Chrome storage
+            chrome.storage.local.set({
+                openai_api_key: apiKey,
+                api_key_status: {
+                    isValid: true,
+                    lastTested: new Date().toISOString()
+                }
+            }, () => {
+                status.style.display = 'block';
+                status.style.background = '#e6ffe6';
+                status.textContent = 'API key saved successfully!';
+                document.getElementById('apiKey').value = '';
+            });
+        }
+
+        // Load existing key status
+        chrome.storage.local.get(['openai_api_key', 'api_key_status'], (result) => {
+            if (result.openai_api_key) {
+                const status = document.getElementById('status');
+                status.style.display = 'block';
+                status.style.background = '#e6ffe6';
+                status.textContent = '✓ API key is already configured';
+            }
+        });
+    </script>
 </body>
+
 </html>

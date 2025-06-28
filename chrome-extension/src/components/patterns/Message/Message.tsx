@@ -83,6 +83,26 @@ const Message = ({
                                     </code>
                                 );
                             },
+                            a({ href, children, ...linkProps }) {
+                                // Intercept special in-app command links
+                                const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                                    if (href === '#open-settings') {
+                                        e.preventDefault();
+                                        chrome.runtime.sendMessage({ action: 'openPopup' });
+                                    }
+                                };
+
+                                return (
+                                    <a
+                                        href={href}
+                                        onClick={handleClick}
+                                        style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                        {...linkProps}
+                                    >
+                                        {children}
+                                    </a>
+                                );
+                            },
                         }}
                     >
                         {content}
